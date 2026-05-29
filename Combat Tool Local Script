@@ -1,0 +1,270 @@
+local players = game:GetService('Players')
+local plr = players.LocalPlayer
+local rs = game:GetService("ReplicatedStorage")
+local remoteFolder = rs:WaitForChild("RemoteEvents")
+local assetFolder = rs:WaitForChild("Assets")
+local auraFolder = assetFolder:WaitForChild("Auras")
+
+--print("RUNNING CLIENT")
+
+
+plr.CharacterAdded:Connect(function(char)
+	local hum = char:WaitForChild("Humanoid")
+	local tool = script.Parent
+	local animationFolder =  auraFolder:WaitForChild(tool.Name):WaitForChild("Animations")
+	local uis = game:GetService("UserInputService")
+	local hudGui = plr.PlayerGui:WaitForChild("HudGui")
+	local currentFolder = auraFolder:WaitForChild(tool.Name)
+	local moduleFolder = rs:WaitForChild("Modules")
+	local moveSettings = rs:WaitForChild("MoveUtilities")
+	local moveModule = require(moduleFolder:WaitForChild("Moves"))
+	
+	local isWalking = false
+	local Equipped = false
+	local isPunching = false
+	local heavyDb = false
+	local isBlocking = false
+	local lastTimeClicked = tick()
+
+	local blockKey = Enum.KeyCode.F
+	local breakKey = Enum.KeyCode.R
+
+	local function CanCombat(character)
+
+		if character:FindFirstChild("Blocking").Value == false and
+			character:FindFirstChild("CanFight").Value == true and
+			not character:FindFirstChild("CombatAction") then
+			print(character, "can combat!")
+			return true
+		else
+			print(character, "can NOT combat!")
+			return false
+		end
+
+	end
+
+	local moves = {}
+
+	local function loadMoves()
+		for _, v in pairs(currentFolder.Moves:GetChildren()) do
+			local templates = {}
+
+			table.clear(templates)
+
+			local template = hudGui.Template:Clone()
+			template.Parent = hudGui.PrimaryFrame.MoveList
+			template.Name = v.Name
+
+			template.Power.Text = v.PowerName.Value
+			template.Key.Text = "["..string.upper(v.Value).."]"
+			template.Visible = true
+
+			table.insert(moves, {Name = v.Name, Key = Enum.KeyCode[v.Value], Debounce = false } )
+			
+		end
+		
+		--[[table.sort(moves, function(a, b)
+			return a.Power < b.Power
+		end)--]]
+
+
+		print(moves)
+	end
+
+	local function unLoadMoves()
+		for _, v in pairs(hudGui.PrimaryFrame.MoveList:GetChildren()) do
+			if v:FindFirstChild("IsMove") then
+				v:Destroy()
+			end
+		end
+
+		table.clear(moves)
+	end
+
+	hum.Died:Connect(function()
+		--tool:Destroy()
+		unLoadMoves()
+	end)
+
+	local function Equip()
+		Equipped = true
+
+		--loadMoves()
+
+		hudGui.PrimaryFrame.MoveList.Visible = true
+	end
+
+	local function UnEquip()
+		Equipped = false
+
+		--unLoadMoves()
+
+		hudGui.PrimaryFrame.MoveList.Visible = false
+	end
+
+	tool.Equipped:Connect(function()
+		Equip()
+	end)
+
+	tool.Unequipped:Connect(function()
+		UnEquip()
+	end)
+
+	for index, move in pairs(moves) do
+		hudGui.PrimaryFrame.MoveList[move.Name].MouseButton1Click:Connect(function()
+			if move.Debounce == false and char.Blocking.Value == false and char.CanFight.Value == true and not char:FindFirstChild("CombatAction") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and Equipped == true then
+				move.Debounce = true
+
+				local folder = moveSettings:FindFirstChild(move.Name)
+
+				print(move.Name," move!")
+
+				remoteFolder.Moves:FireServer(move)
+
+				for i = folder.Cooldown.Value, 1, -1 do
+					hudGui.PrimaryFrame.MoveList:FindFirstChild(move.Name).Key.Text = "["..i.."]"
+					wait(1)
+				end
+
+				hudGui.PrimaryFrame.MoveList:FindFirstChild(move.Name).Key.Text = "["..currentFolder.Moves[move.Name].Value.."]"
+
+				move.Debounce = false
+			end	
+		end)
+	end
+
+	uis.InputBegan:Connect(function(input, processed)
+		--print("INPUING ", input)
+		for _, v in pairs(moves) do
+			if not processed  then
+				if input.KeyCode == v.Key then
+					if v.Debounce == false and char.Blocking.Value == false and char.CanFight.Value == true and not char:FindFirstChild("CombatAction") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and Equipped == true then
+						v.Debounce = true
+
+						local folder = moveSettings:FindFirstChild(v.Name)
+
+						print(v.Name.." move!")
+
+						remoteFolder.Moves:FireServer(v)
+
+						for i = folder.Cooldown.Value, 1, -1 do
+							if hudGui.PrimaryFrame.MoveList:FindFirstChild(v.Name) then
+								hudGui.PrimaryFrame.MoveList:FindFirstChild(v.Name).Key.Text = "["..i.."]"
+								wait(1)
+							end	
+						end
+						if hudGui.PrimaryFrame.MoveList:FindFirstChild(v.Name) then
+							hudGui.PrimaryFrame.MoveList:FindFirstChild(v.Name).Key.Text = "["..currentFolder.Moves[v.Name].Value.."]"
+						end
+
+						v.Debounce = false
+					end		
+				elseif input.KeyCode == Enum.KeyCode.F then
+					if isBlocking == false then
+						isBlocking = true
+						script.Parent.Main:FireServer("Apply Block", true)
+						--print("Blocking")
+					end
+				elseif input.KeyCode == Enum.KeyCode.R then
+					print("INPUT HEAVY", input)
+					if heavyDb == false and char.CanFight.Value == true and char.Blocking.Value == false and not char:FindFirstChild("CombatAction")  and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and Equipped == true then
+						print("Doing heavy!")
+						heavyDb = true
+
+						script.Parent.Main:FireServer("Heavy Punch")
+						task.delay(4, function()
+							heavyDb = false
+						end)
+
+					end	
+				end
+			end	
+		end	
+	end)
+
+	uis.InputEnded:Connect(function(input, processed)
+		--print("INPUT BLOCK", input.KeyCode, char)
+		if processed then return 
+
+		elseif input.KeyCode == Enum.KeyCode.F and not processed then
+			if isBlocking == true and char.CanFight.Value == true then
+				isBlocking = false
+				script.Parent.Main:FireServer("Apply Block", false)
+				--print("Block over")
+			end
+		end
+	end)
+
+	char:WaitForChild("Blocking").Changed:Connect(function()
+		--print("BLOCKING CHANGED")
+		if char.Blocking.Value == true then
+			for i,v in pairs(hum:GetPlayingAnimationTracks()) do
+				if v.Name == "BlockAnimation" then
+					v:Stop()
+				end
+			end
+			local blockAnim = hum.Animator:LoadAnimation(tool.BlockAnimation)
+			blockAnim:Play()
+		--	print("TRUE VAM BOJDF")
+		else
+			for i,v in pairs(hum:GetPlayingAnimationTracks()) do
+				if v.Name == "BlockAnimation" then
+					v:Stop()
+				end
+			end
+		--	print("FALSEHD")
+		end
+	end)
+
+	unLoadMoves()
+	loadMoves()
+	hudGui.PrimaryFrame.MoveList.Visible = false
+
+end)
+
+
+--[[if not plr.Character then
+	char = plr.CharacterAdded:Wait()
+	hum = char:WaitForChild("Humanoid")
+end--]]
+
+print("FINISHED CLIENT RUN")
+--[[coroutine.wrap(function()
+	while wait() do
+		if  char.Humanoid.MoveDirection.X > 0 or char.Humanoid.MoveDirection.X < 0 or char.Humanoid.MoveDirection.Z > 0 or char.Humanoid.MoveDirection.Z < 0 or char.Humanoid.MoveDirection.Y > 0 or char.Humanoid.MoveDirection.Y < 0   then
+			isWalking = true
+		else
+			isWalking = false	
+		end	
+
+		if isWalking == false and Equipped == true then
+			if idleAnimation.IsPlaying and isPunching then
+				idleAnimation:Stop()
+			elseif not idleAnimation.IsPlaying and not isPunching then
+				idleAnimation:Play()
+			end
+		elseif isWalking == false and Equipped == false then
+			for i,v in pairs(hum:GetPlayingAnimationTracks()) do
+				if v.Name == "WalkAnim" then
+					v:Stop()
+				end
+
+				if v.Name == "Idle" then
+					v:Stop()
+				end
+			end
+		elseif isWalking == true and Equipped == true then
+			if isPunching == true then
+				idleAnimation:Stop()
+			else
+				idleAnimation:Play()
+			end
+
+		else
+			if idleAnimation.IsPlaying then
+				idleAnimation:Stop()
+			end
+
+		end
+	end
+end)()--]]
