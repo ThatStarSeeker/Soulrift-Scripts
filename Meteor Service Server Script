@@ -1,0 +1,159 @@
+--local posx = math.random(-256,256)
+--local posz = math.random(-256,256)
+
+local meteor = script.Meteor
+local rs = game:GetService("ReplicatedStorage")
+local moduleFolder = rs:WaitForChild("Modules")
+local craterModuler = require(moduleFolder:WaitForChild("RockModule3"))
+local sfx = rs:WaitForChild("Assets"):WaitForChild("Sfx")
+
+local meteorDb = false
+
+while task.wait(10) do
+	if meteorDb == false then
+		meteorDb = true
+		
+		print("RIFTING")
+		local rift = script.Rift:Clone()
+		rift.Parent = workspace.Debris
+		rift.GlassEffects.Orientation = Vector3.new(0,math.random(-360,360),0)
+		--rift.GlassEffects.Script.Enabled = true
+		local randomSpawn = workspace.MeteorPoints:GetChildren()[math.random(1, #workspace.MeteorPoints:GetChildren())]
+		rift:SetPrimaryPartCFrame(randomSpawn.CFrame)
+
+		local RiftAmbience = sfx.RiftAmbience:Clone()
+		RiftAmbience.Parent = rift.PrimaryPart
+		RiftAmbience.Volume = 0
+		RiftAmbience:Play()
+		game:GetService("TweenService"):Create(RiftAmbience, TweenInfo.new(3), {Volume = 0.5}):Play()
+
+		for _, v in pairs(rift:GetChildren()) do
+			if v:IsA("BasePart") then
+				if v == rift.PrimaryPart then
+					v.Anchored = true
+				end
+
+				local ogSize = v.Size
+				local tweenSize = game:GetService("TweenService"):Create(v, TweenInfo.new(3, Enum.EasingStyle.Cubic), {Size = ogSize})
+
+				v.Size = Vector3.new(0,0,0)
+
+				tweenSize:Play()
+
+				if v == rift.PrimaryPart then
+					v.CFrame = rift.PrimaryPart.CFrame
+				end
+			end
+
+
+		end
+
+		wait(10)
+
+		rift.Center.ParticlesIn:Destroy()
+
+		for _, v in pairs(game:GetService("Players"):GetChildren()) do
+			if v.Character and (v.Character.HumanoidRootPart.Position - randomSpawn.Crash.Position).Magnitude <= 350 then
+				rs.RemoteEvents.CameraShake:FireClient(v,5, 5, 0, .7)
+			end
+		end
+
+		local RiftExplode = sfx.RiftExplode:Clone()
+		RiftExplode.Parent = rift.PrimaryPart
+		RiftExplode.Volume = 0
+		RiftExplode:Play()
+		game:GetService("TweenService"):Create(RiftExplode, TweenInfo.new(0.3), {Volume = 0.5}):Play()
+		game:GetService("Debris"):AddItem(RiftExplode, 4)
+
+		local MeteorWhoosh = sfx.MeteorWhoosh:Clone()
+		MeteorWhoosh.Parent = rift.PrimaryPart
+		MeteorWhoosh.Volume = 0.5
+		MeteorWhoosh:Play()
+
+		local newmeteor = meteor:Clone()
+		newmeteor.Parent = game.Workspace
+		newmeteor:SetPrimaryPartCFrame(randomSpawn.CFrame)
+
+		local meteorTween = game:GetService("TweenService"):Create(newmeteor.PrimaryPart, TweenInfo.new(1.5, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {CFrame = randomSpawn.Crash.CFrame})
+		meteorTween:Play()
+
+		meteorTween.Completed:Connect(function()
+			MeteorWhoosh:Destroy()
+
+			local MeteorExplodeFx = rs.Assets.Vfx.MeteorExplosion:Clone()
+			MeteorExplodeFx.Parent = randomSpawn.Crash
+			MeteorExplodeFx.Enabled = true
+
+			task.delay(1, function()
+				MeteorExplodeFx.Enabled = false
+			end)
+
+			local EssenceModel = rs.Assets.InteractableEssenceModel :Clone()
+			EssenceModel.Parent = workspace.Essences
+			EssenceModel:SetPrimaryPartCFrame(randomSpawn.Crash.CFrame + Vector3.new(0,3,0))
+
+			EssenceModel.PrimaryPart.ProximityPrompt.Triggered:Connect(function(plr)
+				local essenceTool = rs.Assets.Esssences.Essence:Clone()
+				essenceTool.Parent = plr.Backpack
+				EssenceModel:Destroy()
+			end)
+
+			local MeteorExplode = sfx.MeteorImpact:Clone()
+			MeteorExplode.Parent = randomSpawn.Crash
+			MeteorExplode.Volume = 0.5
+			MeteorExplode:Play()
+			--game:GetService("TweenService"):Create(MeteorExplode, TweenInfo.new(0.3), {Volume = 0.5})
+			game:GetService("Debris"):AddItem(MeteorExplode, 4)
+
+			newmeteor:Destroy()
+
+			game:GetService("Debris"):AddItem(newmeteor, 1.5)
+
+			craterModuler.Rocks2V2(randomSpawn.Crash,10,	5, 10, 100000000)
+
+			game:GetService("TweenService"):Create(RiftAmbience, TweenInfo.new(6), {Volume = 0})
+
+			for _, v in pairs(rift:GetDescendants()) do
+				if v:IsA("BasePart") then
+					if v == rift.PrimaryPart then
+						v.Anchored = true
+					end
+
+					local weld1 = Instance.new("WeldConstraint")
+					weld1.Parent = rift.PrimaryPart
+					weld1.Part0 = rift.PrimaryPart
+					weld1.Part1 = v
+
+					local tweenSize = game:GetService("TweenService"):Create(v, TweenInfo.new(6), {Size = Vector3.new(0,0,0)})	
+
+					tweenSize:Play()
+				end
+			end
+
+			for _, v in pairs(rift.Center.ParticlesOut:GetChildren()) do
+				v.Enabled = true
+			end
+
+			task.delay(4, function()
+				for _, v in pairs(rift.Center.ParticlesOut:GetChildren()) do
+					v.Enabled = false
+				end
+				game:GetService("Debris"):AddItem(rift, 10)
+
+				game:GetService("TweenService"):Create(RiftAmbience, TweenInfo.new(3), {Volume = 0}):Play()
+			end)
+
+			for _, v in pairs(game:GetService("Players"):GetChildren()) do
+				if v.Character and (v.Character.HumanoidRootPart.Position - randomSpawn.Crash.Position).Magnitude <= 400 then
+					rs.RemoteEvents.CameraShake:FireClient(v,10, 10, 0, 1.5)
+				end
+			end
+
+			wait(100000000)
+			
+			meteorDb = false
+
+			EssenceModel:Destroy()
+		end)
+	end
+end
