@@ -1,0 +1,505 @@
+local tool = script.Parent
+local rs = game:GetService("ReplicatedStorage")
+local assetFolder = rs:WaitForChild("Assets")
+local animationFolder = assetFolder:WaitForChild("Animations")
+local auraFolder = assetFolder:WaitForChild("Auras")
+local moduleFolder = rs:WaitForChild("Modules")
+local ts = game:GetService("TweenService")
+
+local HitboxCreator = require(moduleFolder.HitboxCreator)
+local TagHumanoid = require(moduleFolder.TagHumanoid)
+local CraterModule = require(moduleFolder.RockModule)
+
+local function CanCombat(character)
+	
+	if character:FindFirstChild("Blocking").Value == false and
+		character:FindFirstChild("CanFight").Value == true and
+		not character:FindFirstChild("CombatAction")
+		and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
+		print(character, "can combat!")
+		return true
+	else
+		print(character, "can NOT combat!")
+		return false
+	end
+	
+end
+
+local function attack(Victim: Model, character: Model, combo, blockAttack)
+	TagHumanoid.CombatTag(character)
+	if combo == 5 and blockAttack == false then -- FINAL PUNCH
+		Victim.CanFight.Value = false
+		Victim.CanGetCombated.Value = false
+		
+		local hitAnim = Victim.Humanoid:LoadAnimation(animationFolder.Hit)
+		hitAnim:Play()
+
+		local punchVfx = assetFolder.Vfx.PunchFx.Middle:Clone()
+		punchVfx.Parent = Victim.Torso
+		game:GetService("Debris"):AddItem(punchVfx, 0.25)
+
+		local EndPos = (character.HumanoidRootPart.CFrame.LookVector)
+
+		local knockbackPlr = Instance.new("LinearVelocity")
+		knockbackPlr.Parent = character.HumanoidRootPart.RootAttachment
+		knockbackPlr.VectorVelocity = EndPos * 10
+		knockbackPlr.Attachment0 = character.HumanoidRootPart.RootAttachment
+		knockbackPlr.MaxForce = 10000
+		game:GetService("Debris"):AddItem(knockbackPlr, 0.15)
+
+		local damageHighlight = assetFolder.Vfx.DamageHightlight:Clone()
+		damageHighlight.Parent = Victim
+		damageHighlight.Adornee = Victim
+		damageHighlight.FillTransparency = 1
+
+		ts:Create(damageHighlight, TweenInfo.new(0.2), {FillTransparency = 0.8}):Play()
+		
+		local knockback = Instance.new("LinearVelocity")
+		knockback.Parent = Victim.HumanoidRootPart.RootAttachment
+		knockback.VectorVelocity = EndPos * 25
+		knockback.Attachment0 = Victim.HumanoidRootPart.RootAttachment
+		knockback.MaxForce = 50000000
+		game:GetService("Debris"):AddItem(knockback, 0.4)
+
+		local punchSfx = assetFolder.Sfx["Heavy Punch"]:Clone()
+		punchSfx.Parent = Victim.HumanoidRootPart
+		punchSfx:Play()
+		game:GetService("Debris"):AddItem(punchSfx, 1)
+
+		task.delay(1, function()
+			Victim.CanGetCombated.Value = true
+			Victim.CanFight.Value = true
+			ts:Create(damageHighlight, TweenInfo.new(0.4), {FillTransparency = 1}):Play()
+			game:GetService("Debris"):AddItem(damageHighlight, 0.5)	
+		end)
+		
+		coroutine.wrap(function()
+			CraterModule.Trail(nil, Victim.HumanoidRootPart, 1.5)
+		end)
+
+		local damageInfo = {Damage = 25, Attacker = character}
+
+		TagHumanoid.Damage(Victim, damageInfo)
+	elseif combo < 5 and combo > 0 and blockAttack == false then -- PUNCH 
+		Victim.CanFight.Value = false
+		Victim.CanGetCombated.Value = false
+		
+		local hitAnim = Victim.Humanoid:LoadAnimation(animationFolder.Hit)
+		hitAnim:Play()
+
+		local punchVfx = assetFolder.Vfx.PunchFx.Middle:Clone()
+		punchVfx.Parent = Victim.Torso
+		game:GetService("Debris"):AddItem(punchVfx, 0.25)
+
+		local EndPos = (character.HumanoidRootPart.CFrame.LookVector)
+
+		local knockbackPlr = Instance.new("LinearVelocity")
+		knockbackPlr.Parent = character.HumanoidRootPart.RootAttachment
+		knockbackPlr.VectorVelocity = EndPos * 10
+		knockbackPlr.Attachment0 = character.HumanoidRootPart.RootAttachment
+		knockbackPlr.MaxForce = 10000
+		game:GetService("Debris"):AddItem(knockbackPlr, 0.15)
+
+		local damageHighlight = assetFolder.Vfx.DamageHightlight:Clone()
+		damageHighlight.Parent = Victim
+		damageHighlight.Adornee = Victim
+		damageHighlight.FillTransparency = 1
+
+		ts:Create(damageHighlight, TweenInfo.new(0.2), {FillTransparency = 0.8}):Play()
+		
+		local knockback = Instance.new("LinearVelocity")
+		knockback.Parent = Victim.HumanoidRootPart.RootAttachment
+		knockback.VectorVelocity = EndPos * 10
+		knockback.Attachment0 = Victim.HumanoidRootPart.RootAttachment
+		knockback.MaxForce = 10000
+		game:GetService("Debris"):AddItem(knockback, 0.15)
+
+		local punchSfx = assetFolder.Sfx["Punch"]:Clone()
+		punchSfx.Parent = Victim.HumanoidRootPart
+		punchSfx:Play()
+		game:GetService("Debris"):AddItem(punchSfx, 1)
+
+		task.delay(0.6, function()
+			Victim.CanGetCombated.Value = true
+			Victim.CanFight.Value = true
+			ts:Create(damageHighlight, TweenInfo.new(0.4), {FillTransparency = 1}):Play()
+			game:GetService("Debris"):AddItem(damageHighlight, 0.5)	
+		end)
+
+		local damageInfo = {Damage = 10, Attacker = character}
+
+		TagHumanoid.Damage(Victim, damageInfo)	
+	elseif combo == 5 and blockAttack == true then -- BLOCK ATTACK
+		local EndPos = (character.HumanoidRootPart.CFrame.LookVector)
+		
+		local knockbackPlr = Instance.new("LinearVelocity")
+		knockbackPlr.Parent = character.HumanoidRootPart.RootAttachment
+		knockbackPlr.VectorVelocity = EndPos * 10
+		knockbackPlr.Attachment0 = character.HumanoidRootPart.RootAttachment
+		knockbackPlr.MaxForce = 10000
+		game:GetService("Debris"):AddItem(knockbackPlr, 0.15)
+		
+		Victim.Blocking.Value = false
+		
+		if Victim.HumanoidRootPart:FindFirstChild("BlockFx") then
+			for _, v in pairs(Victim.HumanoidRootPart:FindFirstChild("BlockFx"):GetChildren()) do
+				v.Enabled = false
+			end
+			game:GetService("Debris"):AddItem(Victim.HumanoidRootPart:FindFirstChild("BlockFx"), 0.7)
+		end
+		
+		local knockback = Instance.new("LinearVelocity")
+		knockback.Parent = Victim.HumanoidRootPart.RootAttachment
+		knockback.VectorVelocity = EndPos * 25
+		knockback.Attachment0 = Victim.HumanoidRootPart.RootAttachment
+		knockback.MaxForce = 50000000
+		game:GetService("Debris"):AddItem(knockback, 0.2)
+
+		local punchSfx = assetFolder.Sfx["Block Punch"]:Clone()
+		punchSfx.Parent = Victim.HumanoidRootPart
+		punchSfx:Play()
+		game:GetService("Debris"):AddItem(punchSfx, 1)
+
+		local hitAnim = Victim.Humanoid:LoadAnimation(animationFolder.Hit)
+		hitAnim:Play()
+
+		local punchVfx = assetFolder.Vfx.BlockedHit.Attachment:Clone()
+		punchVfx.Parent = Victim.Torso
+		game:GetService("Debris"):AddItem(punchVfx, 0.25)
+		
+		local damageHighlight = assetFolder.Vfx.DamageHightlight:Clone()
+		damageHighlight.Parent = Victim
+		damageHighlight.Adornee = Victim
+		damageHighlight.FillTransparency = 1
+
+		ts:Create(damageHighlight, TweenInfo.new(0.2), {FillTransparency = 0.8}):Play()
+		
+		task.delay(1, function()
+			Victim.CanGetCombated.Value = true
+			Victim.CanFight.Value = true
+			ts:Create(damageHighlight, TweenInfo.new(0.4), {FillTransparency = 1}):Play()
+			game:GetService("Debris"):AddItem(damageHighlight, 0.5)	
+		end)
+
+		Victim.CanFight.Value = false
+
+		Victim.CanGetCombated.Value = false
+		
+		coroutine.wrap(function()
+			CraterModule.Trail(nil, Victim.HumanoidRootPart, 1.5)
+		end)
+		
+		TagHumanoid.CombatTag(Victim)
+	elseif combo < 5 and combo > 0 and blockAttack == true then -- BLOCK ATTACK
+		local EndPos = (character.HumanoidRootPart.CFrame.LookVector)
+
+		local knockbackPlr = Instance.new("LinearVelocity")
+		knockbackPlr.Parent = character.HumanoidRootPart.RootAttachment
+		knockbackPlr.VectorVelocity = EndPos * 10
+		knockbackPlr.Attachment0 = character.HumanoidRootPart.RootAttachment
+		knockbackPlr.MaxForce = 10000
+		game:GetService("Debris"):AddItem(knockbackPlr, 0.15)
+		
+		local knockback = Instance.new("LinearVelocity")
+		knockback.Parent = Victim.HumanoidRootPart.RootAttachment
+		knockback.VectorVelocity = EndPos * 10
+		knockback.Attachment0 = Victim.HumanoidRootPart.RootAttachment
+		knockback.MaxForce = 50000000
+		game:GetService("Debris"):AddItem(knockback, 0.2)
+
+		local punchSfx = assetFolder.Sfx["Block Punch"]:Clone()
+		punchSfx.Parent = Victim.HumanoidRootPart
+		punchSfx:Play()
+		game:GetService("Debris"):AddItem(punchSfx, 1)
+
+		local punchVfx = assetFolder.Vfx.BlockedHit.Attachment:Clone()
+		punchVfx.Parent = Victim.Torso
+		game:GetService("Debris"):AddItem(punchVfx, 0.25)
+		
+		TagHumanoid.CombatTag(Victim)
+	elseif combo == 0 and blockAttack == false then -- HEAVY ATTACK
+		print("HEVAY ATTACKCKKC")
+		
+
+		local knockbackPlr = Instance.new("LinearVelocity")
+		knockbackPlr.Parent = character.HumanoidRootPart.RootAttachment
+		knockbackPlr.VectorVelocity = character.HumanoidRootPart.CFrame.LookVector * 10
+		knockbackPlr.Attachment0 = character.HumanoidRootPart.RootAttachment
+		knockbackPlr.MaxForce = 10000
+		game:GetService("Debris"):AddItem(knockbackPlr, 0.15)
+		
+		Victim.Blocking.Value = false
+
+		if Victim.HumanoidRootPart:FindFirstChild("BlockFx") then
+			for _, v in pairs(Victim.HumanoidRootPart:FindFirstChild("BlockFx"):GetChildren()) do
+				v.Enabled = false
+			end
+			game:GetService("Debris"):AddItem(Victim.HumanoidRootPart:FindFirstChild("BlockFx"), 0.7)
+		end
+
+		local hitAnim = Victim.Humanoid:LoadAnimation(animationFolder.Hit)
+		hitAnim:Play()
+
+		local punchVfx = assetFolder.Vfx.BlockBreak.Attachment:Clone()
+		punchVfx.Parent = Victim.Torso
+		game:GetService("Debris"):AddItem(punchVfx, 0.25)
+
+		local EndPos = (character.HumanoidRootPart.CFrame.LookVector)
+
+		local damageHighlight = assetFolder.Vfx.DamageHightlight:Clone()
+		damageHighlight.Parent = Victim
+		damageHighlight.Adornee = Victim
+		damageHighlight.FillTransparency = 1
+
+		ts:Create(damageHighlight, TweenInfo.new(0.2), {FillTransparency = 0.8}):Play()
+
+		local knockback = Instance.new("LinearVelocity")
+		knockback.Parent = Victim.HumanoidRootPart.RootAttachment
+		knockback.VectorVelocity = EndPos * 40
+		knockback.Attachment0 = Victim.HumanoidRootPart.RootAttachment
+		knockback.MaxForce = 50000000
+		game:GetService("Debris"):AddItem(knockback, 0.4)
+
+		local punchSfx = assetFolder.Sfx["Heavy Punch"]:Clone()
+		punchSfx.Parent = Victim.HumanoidRootPart
+		punchSfx:Play()
+		game:GetService("Debris"):AddItem(punchSfx, 1)
+
+		task.delay(1, function()
+			Victim.CanGetCombated.Value = true
+			Victim.CanFight.Value = true
+			ts:Create(damageHighlight, TweenInfo.new(0.4), {FillTransparency = 1}):Play()
+			game:GetService("Debris"):AddItem(damageHighlight, 0.5)	
+		end)
+
+		Victim.CanFight.Value = false
+
+		Victim.CanGetCombated.Value = false
+
+		local damageInfo = {Damage = 25, Attacker = character}
+		
+		coroutine.wrap(function()
+			CraterModule.Trail(nil, Victim.HumanoidRootPart, 1.8)
+		end)
+		
+		TagHumanoid.Damage(Victim, damageInfo)
+	end
+	
+end
+
+local combo = 1
+local currentSwing = tick()
+local timeBeforeComboReset = 3
+local punchCooldown = 0.4
+local punchDb = false
+
+tool.Equipped:Connect(function()
+	
+	local vfx = {}
+	
+	local character = tool.Parent
+	local humanoid = character:WaitForChild("Humanoid")
+	
+	local equipAnim = humanoid.Animator:LoadAnimation(tool.EquipAnimation)
+	
+	equipAnim:Play()
+	
+	local Aura = auraFolder:FindFirstChild(tool.Name)
+	
+	for _, v in pairs(character:GetChildren()) do
+		
+		if Aura.Vfx:FindFirstChild(v.Name) then
+			for i, particle in pairs(Aura.Vfx:FindFirstChild(v.Name):GetChildren()) do
+				local clonedParticle = particle:Clone()
+				clonedParticle.Parent = v
+				
+				table.insert(vfx, clonedParticle)
+			end
+		end
+		
+	end
+	
+	tool.Unequipped:Once(function()
+		for _, v in pairs(vfx) do
+			if v:IsA("ParticleEmitter") then
+				v.Enabled = false
+				task.delay(4, function()
+					v:Destroy()
+				end)
+			elseif v:IsA("Attachment") then
+				for i, particle in pairs(v:GetDescendants()) do
+					if particle:IsA("ParticleEmitter") then
+						particle.Enabled = false
+						task.delay(4, function()
+							particle:Destroy()
+						end)
+					end
+				end
+			elseif v:IsA("Sound") then
+				ts:Create(v, TweenInfo.new(1.5), {Volume = 0}):Play()
+				game:GetService("Debris"):AddItem(v, 2)
+			end
+		end
+	end)
+	
+end)
+
+tool.Activated:Connect(function()
+	
+	local character = tool.Parent
+	local humanoid = character:FindFirstChild("Humanoid")
+	
+	if CanCombat(character) == true and punchDb == false then
+		punchDb = true
+		
+
+		local deltaTime = tick() - currentSwing
+
+		if deltaTime < timeBeforeComboReset then
+
+		else
+			combo = 1
+		end
+		
+		currentSwing = tick()
+		
+		print(combo)
+		
+		local punchAnim = humanoid.Animator:LoadAnimation(animationFolder:FindFirstChild("Punch"..combo))
+
+		punchAnim:Play()
+		
+		local combatAction = Instance.new("Folder")
+		combatAction.Name = 'CombatAction'
+		combatAction.Parent = character
+		
+		task.delay(punchCooldown, function()
+			combatAction:Destroy()
+		end)
+			
+		local punchSwingSfx = assetFolder.Sfx["Punch Swing"]:Clone()
+		punchSwingSfx.Parent = character.HumanoidRootPart
+		punchSwingSfx:Play()
+		game:GetService("Debris"):AddItem(punchSwingSfx, 1)
+		
+		wait(0.25)
+		
+		local infoTable = {
+			HitboxDB = 0.25;
+			Range = Vector3.new(6, 5, 6);
+			RangeOffset = CFrame.new(0,0,2.5);
+		}
+
+		local Hit
+
+		local Hitbox = HitboxCreator(character.HumanoidRootPart, infoTable.Range, infoTable.RangeOffset, 0.25, false)
+		Hit = Hitbox.Hit:Connect(function(Victim)
+			print(Victim, "RAHHH")
+			local eroot = Victim.HumanoidRootPart
+
+			if Victim ~= character and Victim:FindFirstChild("HumanoidRootPart") and Victim.Parent ~= character and Victim.Blocking.Value == false  and Victim.CanGetCombated.Value == true and Victim.Humanoid.Health > 0 then
+				if character.CanFight.Value == true and character.Blocking.Value == false then
+					attack(Victim, character, combo, false)
+				end
+			
+			elseif Victim ~= character and Victim:FindFirstChild("HumanoidRootPart") and Victim.Parent ~= character and Victim.Blocking.Value == true  and Victim.CanGetCombated.Value == true and Victim.Humanoid.Health > 0 then
+				if character.CanFight.Value == true and character.Blocking.Value == false then
+					attack(Victim, character, combo, true)
+				end
+				
+			end
+
+			task.delay(0.25, function()
+				Hit:Disconnect() 
+				
+			end)
+		end)
+		
+		task.delay(0.25, function()
+			if combo ~= 5 then
+				combo += 1
+			else
+				combo = 1
+				wait(punchCooldown * 2)
+			end
+
+			punchDb = false
+		end)
+		
+	end
+	
+end)
+
+script.Parent.Main.OnServerEvent:Connect(function(plr, key, value)
+	print("Fired", key)
+	if key == "Apply Block" then
+		plr.Character.Blocking.Value = value
+		
+		if value == true then
+			local blockingVfx = assetFolder.Vfx.Blocking.BlockFx:Clone()
+			blockingVfx.Parent = plr.Character.HumanoidRootPart
+			for _, v in pairs(plr.Character.HumanoidRootPart:FindFirstChild("BlockFx"):GetChildren()) do
+				v.Enabled = true
+			end
+		elseif value == false then
+			if plr.Character.HumanoidRootPart:FindFirstChild("BlockFx") then
+				for _, v in pairs(plr.Character.HumanoidRootPart:FindFirstChild("BlockFx"):GetChildren()) do
+					v.Enabled = false
+				end
+				plr.Character.HumanoidRootPart:FindFirstChild("BlockFx").Parent = plr.Character.Torso
+				wait(2)
+				plr.Character.Torso:FindFirstChild("BlockFx"):Destroy()
+			end
+		
+		end
+	elseif key == "Heavy Punch" then
+		if plr.Character.Blocking.Value == false and plr.Character.CanFight.Value == true and CanCombat(plr.Character) then
+			local character = plr.Character or plr.CharacterAppearanceLoaded:Wait()
+			
+			local combatAction = Instance.new("Folder")
+			combatAction.Name = 'CombatAction'
+			combatAction.Parent = character
+
+			local punchAnim = character.Humanoid:WaitForChild("Animator"):LoadAnimation(animationFolder.HeavyPunch)
+			punchAnim:Play()
+			
+			local punchSwingSfx = assetFolder.Sfx["Punch Swing"]:Clone()
+			punchSwingSfx.Parent = character.HumanoidRootPart
+			punchSwingSfx:Play()
+			game:GetService("Debris"):AddItem(punchSwingSfx, 1)
+
+			task.delay(punchAnim.Length, function()
+				combatAction:Destroy()
+			end)
+			
+			local infoTable = {
+				HitboxDB = 0.25;
+				Range = Vector3.new(6, 5, 6);
+				RangeOffset = CFrame.new(0,0,2.5);
+			}
+			
+			task.delay(0.56, function()
+				local Hit
+
+				local Hitbox = HitboxCreator(character.HumanoidRootPart, infoTable.Range, infoTable.RangeOffset, 0.25, false)
+				Hit = Hitbox.Hit:Connect(function(Victim)
+					print(Victim, "RAHHH")
+					local eroot = Victim.HumanoidRootPart
+
+					if Victim ~= character and Victim:FindFirstChild("HumanoidRootPart") and Victim.Parent ~= character and Victim.CanGetCombated.Value == true and Victim.Humanoid.Health > 0 then
+						print("FIREEDDDDD")
+
+						attack(Victim, character, 0, false)
+
+					end
+
+					task.delay(0.25, function()
+						Hit:Disconnect() 
+
+					end)
+				end)
+			end)		
+		end
+		
+	end
+end)
